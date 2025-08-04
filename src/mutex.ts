@@ -7,7 +7,7 @@ export default class Mutex {
 
   async lock(): Promise<void> {
     // check if locked is free
-    if (this.locked === false) {
+    if (!this.locked) {
       // if lock is free then check it locked
       this.locked = true;
       return;
@@ -40,50 +40,3 @@ export default class Mutex {
     }
   }
 }
-
-// usage example
-let counter = 0;
-let mutex = new Mutex();
-
-const increment = async (arg: number) => {
-  counter += arg;
-};
-
-const runTasks = async () => {
-  const tasks = [10, 5, 2, 3].map((arg) =>
-    mutex.withLock(() => increment(arg)),
-  );
-
-  await Promise.all(tasks);
-  console.log("Final counter:", counter); // should print 20
-};
-
-runTasks();
-
-// === Simulate a shared bank account with proper locking ===
-
-let balance = 0;
-const mutexBank = new Mutex();
-
-const deposit = async (amount: number, agent: string) => {
-  await mutexBank.withLock(async () => {
-    const current = balance;
-    await new Promise((res) => setTimeout(res, Math.random() * 100)); // simulate network/db delay
-    balance = current + amount;
-    console.log(`${agent} deposited ${amount}, new balance: ${balance}`);
-  });
-};
-
-const runDeposits = async () => {
-  const tasks = [
-    deposit(100, "Agent A"),
-    deposit(200, "Agent B"),
-    deposit(300, "Agent C"),
-    deposit(400, "Agent D"),
-  ];
-
-  await Promise.all(tasks);
-  console.log("Final balance (with mutex):", balance); // Should be 1000
-};
-
-runDeposits();

@@ -1,4 +1,4 @@
-import Mutex from "./mutex";
+import Mutex from "./mutex.js";
 // Shared mutex
 const mutex = new Mutex();
 

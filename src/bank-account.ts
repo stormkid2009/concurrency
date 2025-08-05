@@ -21,6 +21,13 @@ export default class SafeBankAccount {
   }
 
   async withdraw(amount: number): Promise<boolean> {
+    // early check to skip unnecessary lock process
+    if (this.balance <= 0) {
+      console.log(
+        `Sorry,You don't have enough balance to proceed this transaction `,
+      );
+      return false;
+    }
     return await this.mutex.withLock(async () => {
       console.log(`[${this.name}] Attempting to withdraw $${amount}...`);
       await this.simulateDelay();

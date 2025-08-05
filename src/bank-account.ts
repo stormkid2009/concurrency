@@ -1,87 +1,71 @@
+// bank-account.ts
+
 import Mutex from "./mutex.js";
+import { Message, Messages } from "./types.js";
 
-export default class SafeBankAccount {
-  private balance: number;
-  private mutex = new Mutex();
+export class SafeBankAccount {
+  private balance = 0;
+  private readonly mutex = new Mutex();
 
-  constructor(
-    private readonly name: string,
-    initialBalance: number,
-  ) {
-    this.balance = initialBalance;
-  }
+  constructor(public readonly name: string) {}
 
-  async deposit(amount: number): Promise<void> {
-    await this.mutex.withLock(async () => {
-      console.log(`[${this.name}] Depositing $${amount}...`);
-      await this.simulateDelay();
-      this.balance += amount;
-      console.log(`[${this.name}] New Balance: $${this.balance}`);
-    });
-  }
+  async deposit(amount: number): Promise<Message> {
+    console.log(Messages.deposit.attempt(amount, this.name));
 
-  async withdraw(amount: number): Promise<boolean> {
-    // early check to skip unnecessary lock process
-    if (this.balance <= 0) {
-      console.log(
-        `Sorry,You don't have enough balance to proceed this transaction `,
-      );
-      return false;
+    if (amount <= 0) {
+      return Messages.deposit.failure("Amount must be greater than 0");
     }
+
+    await this.mutex.withLock(async () => {
+      this.balance += amount;
+    });
+
+    return Messages.deposit.success(amount, this.name);
+  }
+
+  async withdraw(amount: number): Promise<Message> {
+    console.log(Messages.withdraw.attempt(amount, this.name));
+
+    if (amount <= 0) {
+      return Messages.withdraw.failure("Amount must be greater than 0");
+    }
+
     return await this.mutex.withLock(async () => {
-      console.log(`[${this.name}] Attempting to withdraw $${amount}...`);
-      await this.simulateDelay();
-      if (this.balance >= amount) {
-        this.balance -= amount;
-        console.log(
-          `[${this.name}] Withdrawal successful. New Balance: $${this.balance}`,
-        );
-        return true;
-      } else {
-        console.log(
-          `[${this.name}] Withdrawal failed. Insufficient funds. Current Balance: $${this.balance}`,
-        );
-        return false;
+      if (this.balance < amount) {
+        return Messages.withdraw.failure("Insufficient funds");
       }
+
+      this.balance -= amount;
+      return Messages.withdraw.success(amount, this.name);
     });
   }
 
-  async transferTo(target: SafeBankAccount, amount: number): Promise<void> {
-    console.log(
-      `[${this.name}] Transferring $${amount} to [${target.name}]...`,
-    );
+  async transferTo(target: SafeBankAccount, amount: number): Promise<Message> {
+    console.log(Messages.transfer.attempt(amount, this.name, target.name));
 
-    // Lock both accounts in consistent order to avoid deadlock
+    if (amount <= 0) {
+      return Messages.transfer.failure("Amount must be greater than 0");
+    }
+
     const [first, second] = [this, target].sort((a, b) =>
       a.name.localeCompare(b.name),
     ) as [SafeBankAccount, SafeBankAccount];
 
-    await first.mutex.withLock(async () => {
-      await second.mutex.withLock(async () => {
-        const success = await this.withdraw(amount);
-        if (success) {
-          try {
-            await target.deposit(amount);
-
-            console.log(
-              `[${this.name}] Transfer to [${target.name}] completed.`,
-            );
-          } catch (error) {
-            await this.deposit(amount); // rollback this way money is safe
-            console.error(error);
-          }
-        } else {
-          console.log(`[${this.name}] Transfer failed. Not enough funds.`);
+    return await first.mutex.withLock(async () => {
+      return await second.mutex.withLock(async () => {
+        if (this.balance < amount) {
+          return Messages.transfer.failure("Insufficient funds");
         }
+
+        this.balance -= amount;
+        target.balance += amount;
+
+        return Messages.transfer.success(amount, this.name, target.name);
       });
     });
   }
 
-  async getBalance(): Promise<number> {
-    return await this.mutex.withLock(async () => this.balance);
-  }
-
-  private async simulateDelay() {
-    return new Promise<void>((res) => setTimeout(res, Math.random() * 1000));
+  getBalance(): number {
+    return this.balance;
   }
 }

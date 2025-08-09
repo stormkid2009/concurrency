@@ -1,5 +1,5 @@
 // Semaphore for limiting concurrent access
-class Semaphore {
+export default class Semaphore {
   private permits: number;
   private waitQueue: Array<() => void> = [];
 

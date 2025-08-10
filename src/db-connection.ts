@@ -106,7 +106,7 @@ async function demonstrateConnectionPool() {
       console.log(`📊 ${clientId}: Got result:`, result[0]);
       return result;
     } catch (error) {
-      console.error(`❌ ${clientId}: Error:`, error.message);
+      console.error(`❌ ${clientId}: Error:`, (error as Error).message);
       throw error;
     }
   });
@@ -126,28 +126,3 @@ async function demonstrateConnectionPool() {
     clearInterval(statusMonitor);
   }
 }
-
-// Comparison: What would happen with a mutex?
-export class MutexDatabasePool {
-  private connections: DatabaseConnection[] = [];
-  private currentConnectionIndex = 0;
-
-  constructor(maxConnections: number = 3) {
-    for (let i = 0; i < maxConnections; i++) {
-      this.connections.push(new DatabaseConnection());
-    }
-  }
-
-  // With mutex: Only ONE query at a time, even though we have multiple connections!
-  async executeQueryWithMutex(sql: string, clientId: string): Promise<any[]> {
-    // This would serialize ALL database access, wasting our connection pool
-    console.log(`🐌 ${clientId}: Waiting for exclusive access (SLOW!)`);
-
-    const connection = this.connections[0]; // Always use first connection
-    return await connection.query(sql);
-  }
-}
-
-// Run the demonstration
-console.log("=== Database Connection Pool with Semaphore ===");
-demonstrateConnectionPool().catch(console.error);

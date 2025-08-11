@@ -1,7 +1,7 @@
 import { ReadWriteLock } from "./read-write.js";
 
 // Cache with read-write lock
-class ThreadSafeCache<K, V> {
+export default class ThreadSafeCache<K, V> {
   private cache = new Map<K, V>();
   private rwLock = new ReadWriteLock();
 
